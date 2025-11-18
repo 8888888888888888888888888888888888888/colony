@@ -121,7 +121,6 @@ function WeatherLockscreen:getSubMenuItems()
                     card = _("Minimal"),
                     reading = _("Cover"),
                     retro = _("Retro Analog"),
-                    nightowl = _("Night Owl"),
                 }
                 return T(_("Display Style (%1)"), style_names[display_style])
             end,
@@ -154,23 +153,6 @@ function WeatherLockscreen:getSubMenuItems()
                         G_reader_settings:saveSetting("weather_display_style", "card")
                         G_reader_settings:flush()
                         logger.dbg("WeatherLockscreen: Saved display style: card")
-                        if touchmenu_instance then
-                            touchmenu_instance.item_table = self:getSubMenuItems()
-                            touchmenu_instance:updateItems()
-                        end
-                    end,
-                },
-                {
-                    text = _("Night Owl"),
-                    checked_func = function()
-                        local display_style = G_reader_settings:readSetting("weather_display_style") or "default"
-                        return display_style == "nightowl"
-                    end,
-                    keep_menu_open = true,
-                    callback = function(touchmenu_instance)
-                        G_reader_settings:saveSetting("weather_display_style", "nightowl")
-                        G_reader_settings:flush()
-                        logger.dbg("WeatherLockscreen: Saved display style: nightowl")
                         if touchmenu_instance then
                             touchmenu_instance.item_table = self:getSubMenuItems()
                             touchmenu_instance:updateItems()
@@ -264,55 +246,53 @@ function WeatherLockscreen:getSubMenuItems()
             separator = true,
         }
     }
-    -- Conditionally add content scaling menu when not in nightowl mode
+    -- Add content scaling menu
     local display_style = G_reader_settings:readSetting("weather_display_style") or "default"
-    if display_style ~= "nightowl" then
+    table.insert(menu_items, {
+        text = _("Override scaling"),
+        checked_func = function()
+            return G_reader_settings:readSetting("weather_override_scaling")
+        end,
+        callback = function(touchmenu_instance)
+            local current = G_reader_settings:nilOrTrue("weather_override_scaling")
+            G_reader_settings:saveSetting("weather_override_scaling", not current)
+            touchmenu_instance.item_table = self:getSubMenuItems()
+            touchmenu_instance:updateItems()
+            G_reader_settings:flush()
+        end,
+        separator = not G_reader_settings:readSetting("weather_override_scaling") and display_style ~= "reading",
+    })
+    if G_reader_settings:readSetting("weather_override_scaling") then
         table.insert(menu_items, {
-            text = _("Override scaling"),
-            checked_func = function()
-                return G_reader_settings:readSetting("weather_override_scaling")
+            text_func = function()
+                local fill_percent = tonumber(G_reader_settings:readSetting("weather_fill_percent")) or 90
+                return T(_("Content Fill (%1%)"), fill_percent)
             end,
+            keep_menu_open = true,
             callback = function(touchmenu_instance)
-                local current = G_reader_settings:nilOrTrue("weather_override_scaling")
-                G_reader_settings:saveSetting("weather_override_scaling", not current)
-                touchmenu_instance.item_table = self:getSubMenuItems()
-                touchmenu_instance:updateItems()
-                G_reader_settings:flush()
+                local SpinWidget = require("ui/widget/spinwidget")
+                local fill_percent = tonumber(G_reader_settings:readSetting("weather_fill_percent")) or 90
+                local spin_widget = SpinWidget:new {
+                    title_text = _("Content Fill Percentage"),
+                    info_text = _("How much of the available screen height should be filled (in percent)"),
+                    value = fill_percent,
+                    value_min = 30,
+                    value_max = 130,
+                    value_step = 5,
+                    value_hold_step = 10,
+                    default_value = display_style ~= "reading" and 90 or 60,
+                    unit = "%",
+                    ok_text = _("Set"),
+                    callback = function(spin)
+                        G_reader_settings:saveSetting("weather_fill_percent", tostring(spin.value))
+                        G_reader_settings:flush()
+                        touchmenu_instance:updateItems()
+                    end,
+                }
+                UIManager:show(spin_widget)
             end,
-            separator = not G_reader_settings:readSetting("weather_override_scaling") and display_style ~= "reading",
+            separator = display_style ~= "reading",
         })
-        if G_reader_settings:readSetting("weather_override_scaling") then
-            table.insert(menu_items, {
-                text_func = function()
-                    local fill_percent = tonumber(G_reader_settings:readSetting("weather_fill_percent")) or 90
-                    return T(_("Content Fill (%1%)"), fill_percent)
-                end,
-                keep_menu_open = true,
-                callback = function(touchmenu_instance)
-                    local SpinWidget = require("ui/widget/spinwidget")
-                    local fill_percent = tonumber(G_reader_settings:readSetting("weather_fill_percent")) or 90
-                    local spin_widget = SpinWidget:new {
-                        title_text = _("Content Fill Percentage"),
-                        info_text = _("How much of the available screen height should be filled (in percent)"),
-                        value = fill_percent,
-                        value_min = 30,
-                        value_max = 130,
-                        value_step = 5,
-                        value_hold_step = 10,
-                        default_value = display_style ~= "reading" and 90 or 60,
-                        unit = "%",
-                        ok_text = _("Set"),
-                        callback = function(spin)
-                            G_reader_settings:saveSetting("weather_fill_percent", tostring(spin.value))
-                            G_reader_settings:flush()
-                            touchmenu_instance:updateItems()
-                        end,
-                    }
-                    UIManager:show(spin_widget)
-                end,
-                separator = display_style ~= "reading",
-            })
-        end
     end
     -- Conditionally add Cover scaling menu only when reading mode is selected
     local display_style = G_reader_settings:readSetting("weather_display_style") or "default"
@@ -453,10 +433,6 @@ function WeatherLockscreen:patchScreensaver()
             if weather_widget then
                 local bg_color = Blitbuffer.COLOR_WHITE
                 local display_style = G_reader_settings:readSetting("weather_display_style") or "default"
-                if display_style == "nightowl" and not fallback then
-                    bg_color = G_reader_settings:isTrue("night_mode") and Blitbuffer.COLOR_WHITE or
-                    Blitbuffer.COLOR_BLACK
-                end
 
                 screensaver_instance.screensaver_widget = ScreenSaverWidget:new {
                     widget = weather_widget,
@@ -680,8 +656,6 @@ function WeatherLockscreen:createWeatherWidget()
     local display_module
     if display_style == "card" then
         display_module = require("display_card")
-    elseif display_style == "nightowl" then
-        display_module = require("display_nightowl")
     elseif display_style == "retro" then
         display_module = require("display_retro")
     elseif display_style == "reading" then
