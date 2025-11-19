@@ -10,68 +10,11 @@ local util = require("util")
 
 local WeatherUtils = {}
 
-
-function WeatherUtils:formatHourLabel(hour, twelve_hour_clock)
-    if twelve_hour_clock then
-        if hour == 0 then
-            return "12 AM"
-        elseif hour < 12 then
-            return hour .. " AM"
-        elseif hour == 12 then
-            return "12 PM"
-        else
-            return (hour - 12) .. " PM"
-        end
-    else
-        return hour .. ":00"
-    end
-end
-
-function WeatherUtils:getMoonPhaseIcon(moon_phase)
-    if not moon_phase then
-        return nil
-    end
-
-    -- Map moon phase names to icon files
-    local phase_map = {
-        ["New Moon"] = "new_moon.svg",
-        ["Waxing Crescent"] = "waxing_crescent.svg",
-        ["First Quarter"] = "first_quarter.svg",
-        ["Waxing Gibbous"] = "waxing_gibbous.svg",
-        ["Full Moon"] = "full_moon.svg",
-        ["Waning Gibbous"] = "waning_gibbous.svg",
-        ["Last Quarter"] = "last_quarter.svg",
-        ["Third Quarter"] = "last_quarter.svg",
-        ["Waning Crescent"] = "waning_crescent.svg",
-    }
-
-    local icon_file = phase_map[moon_phase]
-    if not icon_file then
-        -- Default to new moon if phase not recognized
-        icon_file = "new_moon.svg"
-    end
-
-    local icon_path = DataStorage:getDataDir() .. "/icons/moonphases/" .. icon_file
-
-    -- Check if file exists
-    local f = io.open(icon_path, "r")
-    if f then
-        f:close()
-        return icon_path
-    end
-
-    return nil
-end
-
 function WeatherUtils:getPluginDir()
     local callerSource = debug.getinfo(2, "S").source
     if callerSource:find("^@") then
         return callerSource:gsub("^@(.*)/[^/]*", "%1")
     end
-end
-
-function WeatherUtils:getCacheMaxAge()
-    return G_reader_settings:readSetting("weather_cache_max_age") or 3600  -- Default: 1 hour
 end
 
 -- This function was inspired by Project: Title. Thanks!
