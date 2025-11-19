@@ -45,22 +45,6 @@ function WeatherLockscreen:init()
     self:patchScreensaver()
 end
 
-function WeatherLockscreen:addToMainMenu(menu_items)
-    menu_items.weather_lockscreen = {
-        text = _("Weather Lockscreen"),
-        sub_item_table_func = function()
-            return self:getSubMenuItems()
-        end,
-        sorting_hint = "tools",
-    }
-end
-
-function WeatherLockscreen:getSubMenuItems()
-    local menu_items = {
-    }
-    return menu_items
-end
-
 function WeatherLockscreen:patchScreensaver()
     -- Store reference to self for use in closures
     local plugin_instance = self
@@ -155,7 +139,7 @@ function WeatherLockscreen:patchScreensaver()
                     end
 
                     -- Add weather option
-                    local weather_item = genMenuItem(_("Show weather on sleep screen"), "screensaver_type", "weather")
+                    local weather_item = genMenuItem(_("Show The Colony on sleep screen"), "screensaver_type", "weather")
 
                     -- Insert before "Leave screen as-is" option (position 6)
                     table.insert(wallpaper_submenu, 6, weather_item)
